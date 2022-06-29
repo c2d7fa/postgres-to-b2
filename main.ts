@@ -2,22 +2,22 @@ import * as bb64 from "https://deno.land/x/bb64@1.1.0/mod.ts";
 import * as sha1 from "https://deno.land/x/sha1@v1.0.3/mod.ts";
 import * as encodeurl from "https://deno.land/x/encodeurl@1.0.0/mod.ts";
 
-const keyId = Deno.env.get("B2_KEY_ID");
-const key = Deno.env.get("B2_KEY");
-
-const pgHost = Deno.env.get("PG_HOST");
-const pgDb = Deno.env.get("PG_DATABASE");
-const pgUser = Deno.env.get("PG_USER");
-const pgPass = Deno.env.get("PG_PASSWORD");
-
-for (const env of [keyId, key, pgHost, pgDb, pgUser, pgPass]) {
-  if (typeof env !== "string") {
-    console.error(
-      "Must specify B2_KEY_ID, B2_KEY, PG_HOST, PG_DATABASE, PG_USER, and PG_PASSWORD!"
-    );
+function requireEnv(name: string): string {
+  const value = Deno.env.get(name);
+  if (!value) {
+    console.error("Missing required environment variable %o", name);
     Deno.exit(1);
   }
+  return value;
 }
+
+const keyId = requireEnv("B2_KEY_ID");
+const key = requireEnv("B2_KEY");
+
+const pgHost = requireEnv("PG_HOST");
+const pgDb = requireEnv("PG_DATABASE");
+const pgUser = requireEnv("PG_USER");
+const pgPass = requireEnv("PG_PASSWORD");
 
 console.log("Dumping data from database...");
 
@@ -43,10 +43,7 @@ type ReadyAccount = AuthorizedAccount & {
   uploadAuthorizationToken: string;
 };
 
-async function authorize(args: {
-  keyId: string;
-  key: string;
-}): Promise<AuthorizedAccount> {
+async function authorize(): Promise<AuthorizedAccount> {
   const authorizeAccountResponse = await fetch(
     `https://api.backblazeb2.com/b2api/v2/b2_authorize_account`,
     {
@@ -72,7 +69,7 @@ async function authorize(args: {
 
 async function prepareAccountForUpload(
   account: AuthorizedAccount
-): Promise<ReadyAcocunt> {
+): Promise<ReadyAccount> {
   const content = JSON.stringify({ bucketId: account.bucketId });
   const contentLength = content.length;
 
@@ -81,7 +78,7 @@ async function prepareAccountForUpload(
     headers: {
       Authorization: account.authorizationToken,
       "Content-Type": "application/json; charset=utf-8",
-      "Content-Length": contentLength,
+      "Content-Length": `${contentLength}`,
     },
     body: content,
   });
@@ -111,8 +108,8 @@ async function upload(
         `${account.namePrefix}${file.name}`
       ),
       "Content-Type": file.type,
-      "Content-Length": contentLength,
-      "X-Bz-Content-Sha1": contentSha1,
+      "Content-Length": `${contentLength}`,
+      "X-Bz-Content-Sha1": contentSha1.toString(),
     },
     body: content,
   });
@@ -136,7 +133,7 @@ async function upload(
 
 console.log("Connecting to B2...");
 
-const account = await prepareAccountForUpload(await authorize({ key, keyId }));
+const account = await prepareAccountForUpload(await authorize());
 
 console.log("Uploading data...");
 
@@ -149,4 +146,3 @@ upload(account, {
 });
 
 console.log("Done!");
-
