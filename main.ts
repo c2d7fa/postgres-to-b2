@@ -5,12 +5,30 @@ import * as encodeurl from "https://deno.land/x/encodeurl@1.0.0/mod.ts";
 const keyId = Deno.env.get("B2_KEY_ID");
 const key = Deno.env.get("B2_KEY");
 
-for (const env of [keyId, key]) {
+const pgHost = Deno.env.get("PG_HOST");
+const pgDb = Deno.env.get("PG_DATABASE");
+const pgUser = Deno.env.get("PG_USER");
+const pgPass = Deno.env.get("PG_PASSWORD");
+
+for (const env of [keyId, key, pgHost, pgDb, pgUser, pgPass]) {
   if (typeof env !== "string") {
-    console.error("Must specify B2_KEY_ID and B2_KEY!");
+    console.error(
+      "Must specify B2_KEY_ID, B2_KEY, PG_HOST, PG_DATABASE, PG_USER, and PG_PASSWORD!"
+    );
     Deno.exit(1);
   }
 }
+
+console.log("Dumping data from database...");
+
+const dump = Deno.run({
+  cmd: ["pg_dump", "-h", pgHost, "-U", pgUser, "-d", pgDb],
+  env: { PGPASSWORD: pgPass },
+  stdout: "piped",
+});
+
+const dumpOutput = new TextDecoder().decode(await dump.output());
+await dump.status();
 
 type AuthorizedAccount = {
   bucketId: string;
@@ -81,8 +99,9 @@ async function upload(
   account: ReadyAccount,
   file: { content: string; name: string; type: string }
 ): Promise<void> {
-  const contentLength = file.content.length;
-  const contentSha1 = sha1.sha1(file.content, "utf8", "hex");
+  const content = new TextEncoder().encode(dumpOutput);
+  const contentLength = content.length;
+  const contentSha1 = sha1.sha1(content, undefined, "hex");
 
   const response = await fetch(account.uploadUrl, {
     method: "POST",
@@ -95,7 +114,7 @@ async function upload(
       "Content-Length": contentLength,
       "X-Bz-Content-Sha1": contentSha1,
     },
-    body: file.content,
+    body: content,
   });
 
   if (response.status !== 200) {
@@ -115,9 +134,19 @@ async function upload(
   }
 }
 
+console.log("Connecting to B2...");
+
 const account = await prepareAccountForUpload(await authorize({ key, keyId }));
+
+console.log("Uploading data...");
+
+const filename = new Date().toJSON().replace(":", "-").replace(".", "-");
+
 upload(account, {
-  content: "hello this is a test",
-  name: "test1.txt",
+  content: dumpOutput,
+  name: `${pgDb}-${filename}.sql`,
   type: "text/plain",
 });
+
+console.log("Done!");
+
