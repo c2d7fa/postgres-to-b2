@@ -14,3 +14,8 @@ and a timestamp. Backups are saved as plain-text SQL files.
     $ export PG_PASSWORD="..."
     $ export PG_DATABASE="..."
     $ deno run --allow-run --allow-net --allow-env ./main.ts
+
+Build image:
+
+    $ docker build . -t c2d7fa/postgres-to-b2:$VERSION && docker push c2d7fa/postgres-to-b2
+
