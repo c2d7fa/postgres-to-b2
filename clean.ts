@@ -1,3 +1,7 @@
 export function removed(files: string[]): string[] {
-  return [];
+  function isRemoved(file: string): boolean {
+    return false;
+  }
+
+  return files.filter(isRemoved);
 }
