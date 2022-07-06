@@ -1,0 +1,13 @@
+[language.typescript]
+filetypes = ["typescript"]
+roots = [".git"]
+command = "deno"
+args = ["lsp"]
+offset_encoding = "utf-8"
+settings_section = "deno"
+
+[language.typescript.settings.deno]
+enable = true
+lint = true
+unstable = true
+

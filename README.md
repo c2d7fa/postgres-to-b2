@@ -19,3 +19,8 @@ Build image:
 
     $ docker build . -t c2d7fa/postgres-to-b2:$VERSION && docker push c2d7fa/postgres-to-b2
 
+In Kakoune:
+
+    eval %sh{kak-lsp --kakoune -s $kak_session --config ./lsp.toml}
+    lsp-window-enable
+
