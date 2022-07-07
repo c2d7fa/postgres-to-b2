@@ -16,7 +16,7 @@ describe("removing backups", () => {
       "test/postgres-2022-07-01T05:30-550Z.sql",
       "test/postgres-2022-07-01T18:50-100Z.sql",
       "test/postgres-2022-07-02T03:02-100Z.sql",
-      "test/postgres-2022-07-01T08:20-800Z.sql",
+      "test/postgres-2022-07-02T08:20-800Z.sql",
     ];
 
     it("only one from yesterday is kept", () => {
@@ -30,7 +30,7 @@ describe("removing backups", () => {
       "test/postgres-2022-01T05:30-550Z.sql", // Invalid name
       "test/postgres-2022-07-01T18:50-100Z.sql",
       "hello", // Invalid name
-      "test/postgres-2022-07-01T08:20-800Z.sql",
+      "test/postgres-2022-07-02T08:20-800Z.sql",
     ];
 
     it("it isn't removed", () => {
@@ -43,12 +43,12 @@ describe("removing backups", () => {
       "test/postgres-2022-07-01T05:30-550Z.sql",
       "test/postgres-2022-07-01T01:01-250Z.sql",
       "test/postgres-2022-07-02T03:02-100Z.sql",
-      "test/postgres-2022-07-01T08:20-800Z.sql",
+      "test/postgres-2022-07-02T08:20-800Z.sql",
       "test/postgres-2022-07-01T18:50-100Z.sql",
     ];
 
     it("gives same result with different order", () => {
-      assertEquals(removed(example), [example[0], example[3], example[4]]);
+      assertEquals(removed(example), [example[0], example[4]]);
     });
   });
 });
