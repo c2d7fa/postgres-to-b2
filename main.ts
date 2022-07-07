@@ -2,33 +2,17 @@ import * as bb64 from "https://deno.land/x/bb64@1.1.0/mod.ts";
 import * as sha1 from "https://deno.land/x/sha1@v1.0.3/mod.ts";
 import * as encodeurl from "https://deno.land/x/encodeurl@1.0.0/mod.ts";
 
-function requireEnv(name: string): string {
-  const value = Deno.env.get(name);
-  if (!value) {
-    console.error("Missing required environment variable %o", name);
-    Deno.exit(1);
-  }
-  return value;
-}
+type PostgresCredentials = {
+  host: string;
+  user: string;
+  database: string;
+  password: string;
+};
 
-const keyId = requireEnv("B2_KEY_ID");
-const key = requireEnv("B2_KEY");
-
-const pgHost = requireEnv("PG_HOST");
-const pgDb = requireEnv("PG_DATABASE");
-const pgUser = requireEnv("PG_USER");
-const pgPass = requireEnv("PG_PASSWORD");
-
-console.log("Dumping data from database...");
-
-const dump = Deno.run({
-  cmd: ["pg_dump", "-h", pgHost, "-U", pgUser, "-d", pgDb],
-  env: { PGPASSWORD: pgPass },
-  stdout: "piped",
-});
-
-const dumpOutput = new TextDecoder().decode(await dump.output());
-await dump.status();
+type Config = {
+  backblaze: { keyId: string; key: string };
+  postgres: PostgresCredentials;
+};
 
 type AuthorizedAccount = {
   bucketId: string;
@@ -43,13 +27,64 @@ type ReadyAccount = AuthorizedAccount & {
   uploadAuthorizationToken: string;
 };
 
+function configFromEnvironment(): Config {
+  function requireEnv(name: string): string {
+    const value = Deno.env.get(name);
+    if (!value) {
+      console.error("Missing required environment variable %o", name);
+      Deno.exit(1);
+    }
+    return value;
+  }
+
+  return {
+    backblaze: {
+      keyId: requireEnv("B2_KEY_ID"),
+      key: requireEnv("B2_KEY"),
+    },
+    postgres: {
+      host: requireEnv("PG_HOST"),
+      database: requireEnv("PG_DATABASE"),
+      user: requireEnv("PG_USER"),
+      password: requireEnv("PG_PASSWORD"),
+    },
+  };
+}
+
+async function dump(postgres: PostgresCredentials): Promise<string> {
+  const dump = Deno.run({
+    cmd: [
+      "pg_dump",
+      "-h",
+      postgres.host,
+      "-U",
+      postgres.user,
+      "-d",
+      postgres.database,
+    ],
+    env: { PGPASSWORD: postgres.password },
+    stdout: "piped",
+  });
+
+  const dumpOutput = new TextDecoder().decode(await dump.output());
+  await dump.status();
+
+  return dumpOutput;
+}
+
+const config = configFromEnvironment();
+
+console.log("Dumping data from database...");
+
+const dumpOutput = await dump(config.postgres);
+
 async function authorize(): Promise<AuthorizedAccount> {
   const authorizeAccountResponse = await fetch(
     `https://api.backblazeb2.com/b2api/v2/b2_authorize_account`,
     {
       headers: {
         Authorization: `Basic ${bb64.Base64.fromString(
-          `${keyId}:${key}`
+          `${config.backblaze.keyId}:${config.backblaze.key}`
         ).toString()}`,
         "Content-Type": "application/json; charset=utf-8",
       },
@@ -141,7 +176,7 @@ const filename = new Date().toJSON().replace(":", "-").replace(".", "-");
 
 upload(account, {
   content: dumpOutput,
-  name: `${pgDb}-${filename}.sql`,
+  name: `${config.postgres.database}-${filename}.sql`,
   type: "text/plain",
 });
 
