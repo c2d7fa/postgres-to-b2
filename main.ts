@@ -1,29 +1,10 @@
 import * as b2 from "./backblaze.ts";
-
-type PostgresCredentials = {
-  host: string;
-  user: string;
-  database: string;
-  password: string;
-};
-
-type Config = {
-  backblaze: { keyId: string; key: string };
-  postgres: PostgresCredentials;
-};
-
-type AuthorizedAccount = {
-  bucketId: string;
-  bucketName: string;
-  namePrefix: string;
-  apiUrl: string;
-  authorizationToken: string;
-};
-
-type ReadyAccount = AuthorizedAccount & {
-  uploadUrl: string;
-  uploadAuthorizationToken: string;
-};
+import {
+  PostgresCredentials,
+  Config,
+  AuthorizedAccount,
+  ReadyAccount,
+} from "./types.ts";
 
 function configFromEnvironment(): Config {
   function requireEnv(name: string): string {
@@ -120,12 +101,7 @@ async function main() {
   const account = await prepareAccountForUpload(await authorize(config));
 
   console.log("Uploading data...");
-  const filename = new Date().toJSON().replace(":", "-").replace(".", "-");
-  upload(account, {
-    content: dumpOutput,
-    name: `${config.postgres.database}-${filename}.sql`,
-    type: "text/plain",
-  });
+  await upload(account, b2.dumpFile(config, new Date(), dumpOutput));
 
   console.log("Done!");
 }

@@ -2,22 +2,7 @@ import * as bb64 from "https://deno.land/x/bb64@1.1.0/mod.ts";
 import * as sha1 from "https://deno.land/x/sha1@v1.0.3/mod.ts";
 import * as encodeurl from "https://deno.land/x/encodeurl@1.0.0/mod.ts";
 
-type Config = {
-  backblaze: { keyId: string; key: string };
-};
-
-type AuthorizedAccount = {
-  bucketId: string;
-  bucketName: string;
-  namePrefix: string;
-  apiUrl: string;
-  authorizationToken: string;
-};
-
-type ReadyAccount = AuthorizedAccount & {
-  uploadUrl: string;
-  uploadAuthorizationToken: string;
-};
+import { Config, AuthorizedAccount, ReadyAccount } from "./types.ts";
 
 export function authorizeRequest(config: Config): Request {
   return new Request(
@@ -106,4 +91,17 @@ export function uploadRequest(
     },
     body: content,
   });
+}
+
+export function dumpFile(
+  config: Config,
+  now: Date,
+  dump: string
+): { content: string; type: string; name: string } {
+  const filename = now.toJSON().replace(":", "-").replace(".", "-");
+  return {
+    content: dump,
+    name: `${config.postgres.database}-${filename}.sql`,
+    type: "text/plain",
+  };
 }
