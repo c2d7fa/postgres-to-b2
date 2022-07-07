@@ -1,4 +1,5 @@
 import * as b2 from "./backblaze.ts";
+import { removed } from "./clean.ts";
 import {
   PostgresCredentials,
   Config,
@@ -67,6 +68,16 @@ async function prepareAccountForUpload(
   return result;
 }
 
+async function listFiles(
+  config: Config,
+  account: AuthorizedAccount
+): Promise<{ name: string; id: string }[]> {
+  const response = await fetch(b2.listRequest(config, account));
+  const result = b2.listResult(await response.json());
+  if (!result) throw "unable to list files";
+  return result;
+}
+
 async function upload(
   account: ReadyAccount,
   file: { content: string; name: string; type: string }
@@ -106,4 +117,23 @@ async function main() {
   console.log("Done!");
 }
 
+async function clean() {
+  console.log("Reading configuration...");
+  const config = configFromEnvironment();
+
+  console.log("Authenticating with B2...");
+  const account = await authorize(config);
+
+  console.log("Listing files...");
+  const list = await listFiles(config, account);
+
+  const removedNamed = removed(list.map((file) => file.name));
+  console.log("Removing %o files:", removedNamed.length);
+  console.log(removedNamed);
+
+  console.log(list);
+}
+
 main();
+
+//clean();

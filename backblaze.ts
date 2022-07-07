@@ -105,3 +105,28 @@ export function dumpFile(
     type: "text/plain",
   };
 }
+
+export function listRequest(config: Config, account: AuthorizedAccount) {
+  return new Request(`${account.apiUrl}/b2api/v2/b2_list_file_names`, {
+    method: "POST",
+    headers: {
+      Authorization: account.authorizationToken,
+    },
+    body: JSON.stringify({
+      bucketId: account.bucketId,
+      prefix: `${account.namePrefix}${config.postgres.database}`,
+    }),
+  });
+}
+
+export function listResult(json: unknown) {
+  if (typeof json !== "object" || json === null) return null;
+
+  const data = json as any;
+
+  try {
+    return data.files.map((file) => ({ name: file.fileName, id: file.fileId }));
+  } catch (_) {
+    return null;
+  }
+}
