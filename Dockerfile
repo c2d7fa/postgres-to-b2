@@ -6,7 +6,7 @@ RUN apk add --no-cache postgresql14-client
 RUN mkdir -p /work
 
 WORKDIR /work
-COPY ./main.ts /work/main.ts
+COPY ./*.ts /work/
 RUN deno cache ./main.ts
 
 CMD ["run", "--allow-run", "--allow-net", "--allow-env", "./main.ts"]
