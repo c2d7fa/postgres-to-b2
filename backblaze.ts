@@ -98,7 +98,7 @@ export function dumpFile(
   now: Date,
   dump: string
 ): { content: string; type: string; name: string } {
-  const filename = now.toJSON().replace(":", "-").replace(".", "-");
+  const filename = now.toJSON().replaceAll(":", "-").replace(".", "-");
   return {
     content: dump,
     name: `${config.postgres.database}-${filename}.sql`,
