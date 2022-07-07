@@ -72,13 +72,7 @@ async function dump(postgres: PostgresCredentials): Promise<string> {
   return dumpOutput;
 }
 
-const config = configFromEnvironment();
-
-console.log("Dumping data from database...");
-
-const dumpOutput = await dump(config.postgres);
-
-async function authorize(): Promise<AuthorizedAccount> {
+async function authorize(config: Config): Promise<AuthorizedAccount> {
   const authorizeAccountResponse = await fetch(
     `https://api.backblazeb2.com/b2api/v2/b2_authorize_account`,
     {
@@ -131,7 +125,7 @@ async function upload(
   account: ReadyAccount,
   file: { content: string; name: string; type: string }
 ): Promise<void> {
-  const content = new TextEncoder().encode(dumpOutput);
+  const content = new TextEncoder().encode(file.content);
   const contentLength = content.length;
   const contentSha1 = sha1.sha1(content, undefined, "hex");
 
@@ -166,18 +160,28 @@ async function upload(
   }
 }
 
-console.log("Connecting to B2...");
+async function main() {
+  const config = configFromEnvironment();
 
-const account = await prepareAccountForUpload(await authorize());
+  console.log("Dumping data from database...");
 
-console.log("Uploading data...");
+  const dumpOutput = await dump(config.postgres);
 
-const filename = new Date().toJSON().replace(":", "-").replace(".", "-");
+  console.log("Connecting to B2...");
 
-upload(account, {
-  content: dumpOutput,
-  name: `${config.postgres.database}-${filename}.sql`,
-  type: "text/plain",
-});
+  const account = await prepareAccountForUpload(await authorize(config));
 
-console.log("Done!");
+  console.log("Uploading data...");
+
+  const filename = new Date().toJSON().replace(":", "-").replace(".", "-");
+
+  upload(account, {
+    content: dumpOutput,
+    name: `${config.postgres.database}-${filename}.sql`,
+    type: "text/plain",
+  });
+
+  console.log("Done!");
+}
+
+main();
