@@ -1,6 +1,4 @@
-import * as bb64 from "https://deno.land/x/bb64@1.1.0/mod.ts";
-import * as sha1 from "https://deno.land/x/sha1@v1.0.3/mod.ts";
-import * as encodeurl from "https://deno.land/x/encodeurl@1.0.0/mod.ts";
+import * as b2 from "./backblaze.ts";
 
 type PostgresCredentials = {
   host: string;
@@ -73,75 +71,26 @@ async function dump(postgres: PostgresCredentials): Promise<string> {
 }
 
 async function authorize(config: Config): Promise<AuthorizedAccount> {
-  const authorizeAccountResponse = await fetch(
-    `https://api.backblazeb2.com/b2api/v2/b2_authorize_account`,
-    {
-      headers: {
-        Authorization: `Basic ${bb64.Base64.fromString(
-          `${config.backblaze.keyId}:${config.backblaze.key}`
-        ).toString()}`,
-        "Content-Type": "application/json; charset=utf-8",
-      },
-    }
-  );
-
-  const authorizeAccountResponseValue = await authorizeAccountResponse.json();
-
-  const bucketId = authorizeAccountResponseValue.allowed.bucketId;
-  const bucketName = authorizeAccountResponseValue.allowed.bucketName;
-  const namePrefix = authorizeAccountResponseValue.allowed.namePrefix;
-  const apiUrl = authorizeAccountResponseValue.apiUrl;
-  const authorizationToken = authorizeAccountResponseValue.authorizationToken;
-
-  return { bucketId, bucketName, namePrefix, apiUrl, authorizationToken };
+  const response = await fetch(b2.authorizeRequest(config));
+  const result = b2.authorizeResult(await response.json());
+  if (!result) throw "unable to authorize";
+  return result;
 }
 
 async function prepareAccountForUpload(
   account: AuthorizedAccount
 ): Promise<ReadyAccount> {
-  const content = JSON.stringify({ bucketId: account.bucketId });
-  const contentLength = content.length;
-
-  const response = await fetch(`${account.apiUrl}/b2api/v2/b2_get_upload_url`, {
-    method: "POST",
-    headers: {
-      Authorization: account.authorizationToken,
-      "Content-Type": "application/json; charset=utf-8",
-      "Content-Length": `${contentLength}`,
-    },
-    body: content,
-  });
-
-  const result = await response.json();
-
-  return {
-    ...account,
-    uploadUrl: result.uploadUrl,
-    uploadAuthorizationToken: result.authorizationToken,
-  };
+  const response = await fetch(b2.prepareUploadRequest(account));
+  const result = b2.prepareUploadResult(account, await response.json());
+  if (!result) throw "unable to prepare upload";
+  return result;
 }
 
 async function upload(
   account: ReadyAccount,
   file: { content: string; name: string; type: string }
 ): Promise<void> {
-  const content = new TextEncoder().encode(file.content);
-  const contentLength = content.length;
-  const contentSha1 = sha1.sha1(content, undefined, "hex");
-
-  const response = await fetch(account.uploadUrl, {
-    method: "POST",
-    headers: {
-      Authorization: account.uploadAuthorizationToken,
-      "X-Bz-File-Name": encodeurl.encodeUrl(
-        `${account.namePrefix}${file.name}`
-      ),
-      "Content-Type": file.type,
-      "Content-Length": `${contentLength}`,
-      "X-Bz-Content-Sha1": contentSha1.toString(),
-    },
-    body: content,
-  });
+  const response = await fetch(b2.uploadRequest(account, file));
 
   if (response.status !== 200) {
     const text = await response.text();
@@ -161,20 +110,17 @@ async function upload(
 }
 
 async function main() {
+  console.log("Reading configuration...");
   const config = configFromEnvironment();
 
   console.log("Dumping data from database...");
-
   const dumpOutput = await dump(config.postgres);
 
   console.log("Connecting to B2...");
-
   const account = await prepareAccountForUpload(await authorize(config));
 
   console.log("Uploading data...");
-
   const filename = new Date().toJSON().replace(":", "-").replace(".", "-");
-
   upload(account, {
     content: dumpOutput,
     name: `${config.postgres.database}-${filename}.sql`,
