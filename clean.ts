@@ -14,11 +14,11 @@ function stripTimezone(d: Date): Date {
 }
 
 function parse(file: string): null | { timestamp: Date } {
-  const dateRegex = /[0-9][0-9T:Z-]+/;
+  const dateRegex = /[0-9][0-9TZ-]+/;
   const dateMatch = file.match(dateRegex);
   if (!(dateMatch && dateMatch[0])) return null;
   try {
-    const date = parseDate(dateMatch[0], "yyyy-MM-ddTHH:mm-SSSZ");
+    const date = parseDate(dateMatch[0], "yyyy-MM-ddTHH-mm-ss-SSSZ");
     return { timestamp: stripTimezone(date) };
   } catch (e) {
     return null;
