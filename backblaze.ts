@@ -130,3 +130,15 @@ export function listResult(json: unknown) {
     return null;
   }
 }
+
+export function removeRequest(config: Config, account: AuthorizedAccount, file: {name: string, id: string}) {
+  return new Request(`${account.apiUrl}/b2api/v2/b2_delete_file_version`, {
+    method: "POST",
+    headers: {
+    Authorization: account.authorizationToken,},
+    body: JSON.stringify({
+      fileId: file.id,
+      fileName: file.name,
+    }),
+  });
+}

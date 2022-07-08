@@ -101,6 +101,24 @@ async function upload(
   }
 }
 
+async function remove(
+  config: Config,
+  account: AuthorizedAccount,
+  file: { name: string; id: string }
+): Promise<void> {
+  const response = await fetch(b2.removeRequest(config, account, file));
+
+  if (response.status !== 200) {
+    const text = await response.text();
+    console.error(text);
+    throw {
+      error: "Error while uploading file",
+      response,
+      body: text,
+    };
+  }
+}
+
 async function main() {
   console.log("Reading configuration...");
   const config = configFromEnvironment();
@@ -128,12 +146,18 @@ async function clean() {
   const list = await listFiles(config, account);
 
   const removedNamed = removed(list.map((file) => file.name));
-  console.log("Removing %o files:", removedNamed.length);
-  console.log(removedNamed);
+  const removedFiles = list.filter((file) => removedNamed.includes(file.name));
 
-  console.log(list);
+  for (const file of removedFiles) {
+    console.log("Deleting %o...", file.name);
+    await remove(config, account, file);
+  }
+
+  console.log("Done!");
 }
 
-main();
-
-//clean();
+if (Deno.args.includes("--clean")) {
+  clean();
+} else {
+  main();
+}
